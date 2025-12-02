@@ -1,0 +1,28 @@
+{
+  "name": "pokemon-red",
+  "version": "1.0.0",
+  "description": "recreating pokemon red?",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Carolinewk/pokemon-red.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Carolinewk/pokemon-red/issues"
+  },
+  "homepage": "https://github.com/Carolinewk/pokemon-red#readme",
+  "dependencies": {
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.1",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "^5.9.3"
+  }
+}
