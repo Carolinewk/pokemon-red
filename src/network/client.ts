@@ -1,8 +1,8 @@
 type TimeSync = {
-    request_sent_at: number;
-    clock_offset: number;
-    lowest_ping: number;
-    last_ping: number;
+  clock_offset: number;     // difference between server clock and local clock
+  lowest_ping: number;      // best round-trip time achieved so far
+  request_sent_at: number;  // timestamp when last get_time request was sent
+  last_ping: number;        // most recent measured RTT (ms)
 };
 
 const time_sync: TimeSync = {
@@ -13,17 +13,6 @@ const time_sync: TimeSync = {
 };
 
 const ws = new WebSocket(`ws://${window.location.hostname}:8080`);
-
-function ensure_open(): void {
-  if (ws.readyState !== WebSocket.OPEN) {
-    throw new Error("WebSocket not open");
-  }
-}
-
-export function send(obj: any): void {
-  ensure_open();
-  ws.send(JSON.stringify(obj));
-}
 
 type MessageHandler = (message: any) => void;
 const room_watchers = new Map<string, MessageHandler>();
@@ -40,6 +29,17 @@ export function server_time(): number {
     throw new Error("server_time() called before initial sync");
   }
   return Math.floor(now() + time_sync.clock_offset);
+}
+
+function ensure_open(): void {
+  if (ws.readyState !== WebSocket.OPEN) {
+    throw new Error("WebSocket not open");
+  }
+}
+
+export function send(obj: any): void {
+  ensure_open();
+  ws.send(JSON.stringify(obj));
 }
 
 function register_handler(room: string, handler?: MessageHandler): void {
@@ -69,12 +69,13 @@ ws.addEventListener("message", (event) => {
 
   switch (msg.$) {
     case "info_time": {
-      const arrival_time    = now();
-      const ping = arrival_time - time_sync.request_sent_at;
+      const t    = now();
+      const ping = t - time_sync.request_sent_at;
+
       time_sync.last_ping = ping;
 
       if (ping < time_sync.lowest_ping) {
-        const local_avg    = Math.floor((time_sync.request_sent_at + arrival_time) / 2);
+        const local_avg    = Math.floor((time_sync.request_sent_at + t) / 2);
         time_sync.clock_offset = msg.time - local_avg;
         time_sync.lowest_ping  = ping;
       }
@@ -99,6 +100,7 @@ ws.addEventListener("message", (event) => {
   }
 });
 
+// API
 export function gen_name(): string {
   const alphabet   = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-";
   const bytes      = new Uint8Array(8);
@@ -118,10 +120,6 @@ export function gen_name(): string {
   }
 
   return out;
-}
-
-export function ping(): number {
-  return time_sync.last_ping;
 }
 
 export function post(room: string, data: any): string {
@@ -145,6 +143,10 @@ export function unwatch(room: string): void {
   send({ $: "unwatch", room });
 }
 
+export function close(): void {
+  ws.close();
+}
+
 export function on_sync(callback: () => void): void {
   if (is_synced) {
     callback();
@@ -153,6 +155,6 @@ export function on_sync(callback: () => void): void {
   sync_listeners.push(callback);
 }
 
-export function close(): void {
-  ws.close();
+export function ping(): number {
+  return time_sync.last_ping;
 }
