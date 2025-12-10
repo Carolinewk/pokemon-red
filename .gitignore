@@ -13,3 +13,10 @@ pnpm-debug.log*
 .DS_Store
 
 Prompt.md
+
+
+db/
+
+db
+
+public/client/*
