@@ -597,7 +597,17 @@ function startGame() {
   window.addEventListener("resize", () => resizeCanvas(canvas));
   let room = prompt("Enter room name:") || "";
   room = room.trim() || gen_name();
-  const nick = prompt("Enter your nickname (single character):") || "";
+  let nick = "";
+  while (true) {
+    const input = prompt("Enter your nickname (1-14 characters):") || "";
+    const trimmed = input.trim();
+    if (trimmed.length === 0 || trimmed.length > 14) {
+      alert("Nickname must be between 1 and 14 characters.");
+      continue;
+    }
+    nick = trimmed;
+    break;
+  }
   document.title = `Pokemon Grid (${room})`;
   const smooth = (past, curr) => {
     if (curr[nick]) {

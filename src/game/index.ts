@@ -343,11 +343,19 @@ export function startGame(): void {
   let room = prompt("Enter room name:") || "";
   room = room.trim() || gen_name();
 
-  const nick = prompt("Enter your nickname (single character):") || "";
-  // if (nick.length !== 1) {
-  //   alert("Nickname must be exactly one character.");
-  //   throw new Error("Nickname must be one character");
-  // }
+  let nick = "";
+  while (true) {
+    const input = prompt("Enter your nickname (1-14 characters):") || "";
+    const trimmed = input.trim();
+
+    if (trimmed.length === 0 || trimmed.length > 14) {
+      alert("Nickname must be between 1 and 14 characters.");
+      continue;
+    }
+
+    nick = trimmed;
+    break;
+  }
 
   document.title = `Pokemon Grid (${room})`;
 
