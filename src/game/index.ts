@@ -201,7 +201,7 @@ function makeCanvas(): HTMLCanvasElement {
   canvas.style.width = "100vw";
   canvas.style.height = "100vh";
   canvas.style.display = "block";
-  canvas.style.background = "#d9e0ea";
+  canvas.style.background = "#b7c8d5";
   return canvas;
 }
 
@@ -211,39 +211,44 @@ function resizeCanvas(canvas: HTMLCanvasElement) {
 }
 
 function drawGrid(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
-  const scaleX   = canvas.width / WORLD_WIDTH;
-  const scaleY   = canvas.height / WORLD_HEIGHT;
-  const tileW    = TILE_SIZE * scaleX;
-  const tileH    = TILE_SIZE * scaleY;
-  const toneA    = "#c5d4df";
-  const toneB    = "#b7c8d5";
+  // Fill full canvas background
+  ctx.fillStyle = "#b7c8d5";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const mapWidth  = WORLD_WIDTH;
+  const mapHeight = WORLD_HEIGHT;
+  const centerX   = Math.floor((canvas.width  - mapWidth) / 2);
+  const centerY   = Math.floor((canvas.height - mapHeight) / 2);
+
+  const tileColor = "#ffffff";
 
   for (let row = 0; row < WORLD_ROWS; row++) {
     for (let col = 0; col < WORLD_COLS; col++) {
-      const color = (row + col) % 2 === 0 ? toneA : toneB;
-      ctx.fillStyle = color;
-      ctx.fillRect(col * tileW, row * tileH, tileW, tileH);
+      const x = centerX + col * TILE_SIZE;
+      const y = centerY + row * TILE_SIZE;
+      ctx.fillStyle = tileColor;
+      ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
     }
   }
 
-  ctx.strokeStyle = "#8aa0b0";
+  ctx.strokeStyle = "#000000";
   ctx.lineWidth = 1;
 
   // Vertical lines
   for (let c = 0; c <= WORLD_COLS; c++) {
-    const x = Math.floor(c * tileW) + 0.5;
+    const x = Math.floor(centerX + c * TILE_SIZE) + 0.5;
     ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, canvas.height);
+    ctx.moveTo(x, centerY);
+    ctx.lineTo(x, centerY + mapHeight);
     ctx.stroke();
   }
 
   // Horizontal lines
   for (let r = 0; r <= WORLD_ROWS; r++) {
-    const y = Math.floor(r * tileH) + 0.5;
+    const y = Math.floor(centerY + r * TILE_SIZE) + 0.5;
     ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(canvas.width, y);
+    ctx.moveTo(centerX, y);
+    ctx.lineTo(centerX + mapWidth, y);
     ctx.stroke();
   }
 }
@@ -255,12 +260,15 @@ function drawPlayer(
   player: Player,
   isSelf: boolean
 ): void {
-  const scaleX = canvas.width / WORLD_WIDTH;
-  const scaleY = canvas.height / WORLD_HEIGHT;
-  const spriteW = TILE_SIZE * scaleX;
-  const spriteH = TILE_SIZE * scaleY;
-  const x = player.px * scaleX - spriteW / 2;
-  const y = player.py * scaleY - spriteH / 2;
+  const mapWidth  = WORLD_COLS * TILE_SIZE;
+  const mapHeight = WORLD_ROWS * TILE_SIZE;
+  const offsetX   = (canvas.width  - mapWidth) / 2;
+  const offsetY   = (canvas.height - mapHeight) / 2;
+
+  const spriteW = TILE_SIZE;
+  const spriteH = TILE_SIZE;
+  const x = offsetX + player.px - spriteW / 2;
+  const y = offsetY + player.py - spriteH / 2;
 
   // Simple blocky sprite (head + body + shoes)
   ctx.fillStyle = isSelf ? "#e2574c" : "#3a6ea5";
@@ -334,13 +342,12 @@ export function startGame(): void {
   const ctx    = canvas.getContext("2d");
   if (!ctx) throw new Error("Canvas 2D context unavailable");
   ctx.imageSmoothingEnabled = false;
-
   container.innerHTML = "";
   container.appendChild(canvas);
   resizeCanvas(canvas);
   window.addEventListener("resize", () => resizeCanvas(canvas));
 
-  let room = prompt("Enter room name:") || "";
+  let room = prompt("Enter ROOM name:") || "";
   room = room.trim() || gen_name();
 
   let nick = "";

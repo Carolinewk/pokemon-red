@@ -7,9 +7,9 @@ function now(): number {
   return Date.now();
 }
 
-setInterval(() => {
-  console.log("Server time:", now());
-}, 1000);
+// setInterval(() => {
+//   console.log("Server time:", now());
+// }, 1000);
 
 if (!existsSync("./db")) {
   mkdirSync("./db");
