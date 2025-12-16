@@ -1,21 +1,22 @@
 import { Vibi } from "../engine/vibi";
 import { on_sync, ping, gen_name } from "../network/client";
 import * as syncClient from "../network/client";
+import { MAP001 } from "./maps/map001";
 
-// Player data tracked for each nickname
+type MovementKey = "w" | "a" | "s" | "d";
+
 type Player = {
-  px: number;  // current position (tile-centered)
-  py: number;
-  tx: number;  // target tile center being walked toward
-  ty: number;
-  moving: boolean;
-  w: number;   // input state
-  a: number;
-  s: number;
-  d: number;
+  positionX: number; // current position (tile-centered, pixels)
+  positionY: number;
+  targetX: number;   // target tile center being walked toward (pixels)
+  targetY: number;
+  isMoving: boolean;
+  upPressed: boolean;    // input state (WASD)
+  leftPressed: boolean;
+  downPressed: boolean;
+  rightPressed: boolean;
 };
 
-// Map of nick -> player
 type GameState = {
   [nick: string]: Player;
 };
@@ -23,17 +24,17 @@ type GameState = {
 // Messages sent between clients
 type GamePost =
   | { $: "spawn"; nick: string; px: number; py: number }
-  | { $: "down"; key: "w" | "a" | "s" | "d"; player: string }
-  | { $: "up"; key: "w" | "a" | "s" | "d"; player: string };
+  | { $: "down"; key: MovementKey; player: string }
+  | { $: "up"; key: MovementKey; player: string };
 
 // Simulation + world tuning
 const TICK_RATE         = 24;
 const TOLERANCE         = 10; // ms of leeway when reconciling posts
-const TILE_SIZE         = 24;
-const WORLD_COLS        = 40;
-const WORLD_ROWS        = 22;
-const WORLD_WIDTH       = TILE_SIZE * WORLD_COLS;
-const WORLD_HEIGHT      = TILE_SIZE * WORLD_ROWS;
+const TILE_SIZE         = MAP001.tileSize;
+const WORLD_COLS        = MAP001.width;
+const WORLD_ROWS        = MAP001.height;
+const WORLD_WIDTH       = MAP001.pixelWidth;
+const WORLD_HEIGHT      = MAP001.pixelHeight;
 const PIXELS_PER_SECOND = TILE_SIZE * 6; // tiles per second
 const PIXELS_PER_TICK   = PIXELS_PER_SECOND / TICK_RATE;
 const HALF_TILE         = TILE_SIZE / 2;
@@ -53,11 +54,11 @@ function nearestTileIndex(value: number, maxIndex: number): number {
   return clamp(snapped, 0, maxIndex);
 }
 
-function pickDirection(player: Player): "w" | "a" | "s" | "d" | null {
-  if (player.w) return "w";
-  if (player.a) return "a";
-  if (player.s) return "s";
-  if (player.d) return "d";
+function pickMovementKey(player: Player): MovementKey | null {
+  if (player.upPressed) return "w";
+  if (player.leftPressed) return "a";
+  if (player.downPressed) return "s";
+  if (player.rightPressed) return "d";
   return null;
 }
 
@@ -76,77 +77,95 @@ function on_tick(state: GameState): GameState {
   for (const [nick, player] of Object.entries(state)) {
     if (!player) continue;
 
-    let { px, py, tx, ty, moving } = player;
+    let { positionX, positionY, targetX, targetY, isMoving } = player;
 
     // Ensure we stick to tile centers once we reach a target
-    if (Math.abs(px - tx) < 0.001 && Math.abs(py - ty) < 0.001) {
-      px     = tx;
-      py     = ty;
-      moving = false;
+    if (Math.abs(positionX - targetX) < 0.001 && Math.abs(positionY - targetY) < 0.001) {
+      positionX = targetX;
+      positionY = targetY;
+      isMoving = false;
     }
 
     // If idle, see if a direction key is pressed to start a new tile step
-    if (!moving) {
-      const dir = pickDirection(player);
-      if (dir) {
-        const tileX = nearestTileIndex(tx, WORLD_COLS - 1);
-        const tileY = nearestTileIndex(ty, WORLD_ROWS - 1);
+    if (!isMoving) {
+      const movementKey = pickMovementKey(player);
+      if (movementKey) {
+        const currentTileX = nearestTileIndex(targetX, WORLD_COLS - 1);
+        const currentTileY = nearestTileIndex(targetY, WORLD_ROWS - 1);
 
-        let nextTileX = tileX;
-        let nextTileY = tileY;
+        let nextTileX = currentTileX;
+        let nextTileY = currentTileY;
 
-        switch (dir) {
+        switch (movementKey) {
           case "w":
-            nextTileY = clamp(tileY - 1, 0, WORLD_ROWS - 1);
+            nextTileY = clamp(currentTileY - 1, 0, WORLD_ROWS - 1);
             break;
           case "a":
-            nextTileX = clamp(tileX - 1, 0, WORLD_COLS - 1);
+            nextTileX = clamp(currentTileX - 1, 0, WORLD_COLS - 1);
             break;
           case "s":
-            nextTileY = clamp(tileY + 1, 0, WORLD_ROWS - 1);
+            nextTileY = clamp(currentTileY + 1, 0, WORLD_ROWS - 1);
             break;
           case "d":
-            nextTileX = clamp(tileX + 1, 0, WORLD_COLS - 1);
+            nextTileX = clamp(currentTileX + 1, 0, WORLD_COLS - 1);
             break;
         }
 
-        const nextTx = tileCenterFromIndex(nextTileX);
-        const nextTy = tileCenterFromIndex(nextTileY);
+        const nextTargetX = tileCenterFromIndex(nextTileX);
+        const nextTargetY = tileCenterFromIndex(nextTileY);
 
-        if (nextTx !== tx || nextTy !== ty) {
-          tx     = nextTx;
-          ty     = nextTy;
-          moving = true;
+        if (
+          (nextTargetX !== targetX || nextTargetY !== targetY) &&
+          !MAP001.isBlocked(nextTileX, nextTileY)
+        ) {
+          targetX = nextTargetX;
+          targetY = nextTargetY;
+          isMoving = true;
         }
       }
     }
 
     // Continue walking toward the target tile center
-    if (moving) {
-      px = stepToward(px, tx);
-      py = stepToward(py, ty);
+    if (isMoving) {
+      positionX = stepToward(positionX, targetX);
+      positionY = stepToward(positionY, targetY);
 
-      if (Math.abs(px - tx) < 0.001 && Math.abs(py - ty) < 0.001) {
-        px     = tx;
-        py     = ty;
-        moving = false;
+      if (Math.abs(positionX - targetX) < 0.001 && Math.abs(positionY - targetY) < 0.001) {
+        positionX = targetX;
+        positionY = targetY;
+        isMoving = false;
       }
     }
 
     next[nick] = {
-      px,
-      py,
-      tx,
-      ty,
-      moving,
-      w: player.w,
-      a: player.a,
-      s: player.s,
-      d: player.d,
+      positionX,
+      positionY,
+      targetX,
+      targetY,
+      isMoving,
+      upPressed: player.upPressed,
+      leftPressed: player.leftPressed,
+      downPressed: player.downPressed,
+      rightPressed: player.rightPressed,
     };
   }
 
   return next;
+}
+
+function setMovementKeyPressed(player: Player, key: MovementKey, isPressed: boolean): Player {
+  switch (key) {
+    case "w":
+      return { ...player, upPressed: isPressed };
+    case "a":
+      return { ...player, leftPressed: isPressed };
+    case "s":
+      return { ...player, downPressed: isPressed };
+    case "d":
+      return { ...player, rightPressed: isPressed };
+  }
+
+  return player;
 }
 
 // Apply a post (spawn or key change) to the state
@@ -157,32 +176,33 @@ function on_post(post: GamePost, state: GameState): GameState {
         return state;
       }
 
+      const spawnPixelX = post.px;
+      const spawnPixelY = post.py;
+      const spawnTileX = nearestTileIndex(spawnPixelX, WORLD_COLS - 1);
+      const spawnTileY = nearestTileIndex(spawnPixelY, WORLD_ROWS - 1);
+      const spawnTileCenterX = tileCenterFromIndex(spawnTileX);
+      const spawnTileCenterY = tileCenterFromIndex(spawnTileY);
+
       const player: Player = {
-        px: tileCenterFromIndex(nearestTileIndex(post.px, WORLD_COLS - 1)),
-        py: tileCenterFromIndex(nearestTileIndex(post.py, WORLD_ROWS - 1)),
-        tx: tileCenterFromIndex(nearestTileIndex(post.px, WORLD_COLS - 1)),
-        ty: tileCenterFromIndex(nearestTileIndex(post.py, WORLD_ROWS - 1)),
-        moving: false,
-        w: 0,
-        a: 0,
-        s: 0,
-        d: 0,
+        positionX: spawnTileCenterX,
+        positionY: spawnTileCenterY,
+        targetX: spawnTileCenterX,
+        targetY: spawnTileCenterY,
+        isMoving: false,
+        upPressed: false,
+        leftPressed: false,
+        downPressed: false,
+        rightPressed: false,
       };
 
       return { ...state, [post.nick]: player };
     }
 
-    case "down": {
-      const target = state[post.player];
-      if (!target) return state;
-      const updated = { ...target, [post.key]: 1 } as Player;
-      return { ...state, [post.player]: updated };
-    }
-
+    case "down":
     case "up": {
-      const target = state[post.player];
-      if (!target) return state;
-      const updated = { ...target, [post.key]: 0 } as Player;
+      const targetPlayer = state[post.player];
+      if (!targetPlayer) return state;
+      const updated = setMovementKeyPressed(targetPlayer, post.key, post.$ === "down");
       return { ...state, [post.player]: updated };
     }
   }
@@ -210,51 +230,12 @@ function resizeCanvas(canvas: HTMLCanvasElement) {
   canvas.height = window.innerHeight;
 }
 
-function drawGrid(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
-  // Fill full canvas background
-  ctx.fillStyle = "#b7c8d5";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  const mapWidth  = WORLD_WIDTH;
-  const mapHeight = WORLD_HEIGHT;
-  const centerX   = Math.floor((canvas.width  - mapWidth) / 2);
-  const centerY   = Math.floor((canvas.height - mapHeight) / 2);
-
-  const tileColor = "#ffffff";
-
-  for (let row = 0; row < WORLD_ROWS; row++) {
-    for (let col = 0; col < WORLD_COLS; col++) {
-      const x = centerX + col * TILE_SIZE;
-      const y = centerY + row * TILE_SIZE;
-      ctx.fillStyle = tileColor;
-      ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-    }
-  }
-
-  ctx.strokeStyle = "#000000";
-  ctx.lineWidth = 1;
-
-  // Vertical lines
-  for (let c = 0; c <= WORLD_COLS; c++) {
-    const x = Math.floor(centerX + c * TILE_SIZE) + 0.5;
-    ctx.beginPath();
-    ctx.moveTo(x, centerY);
-    ctx.lineTo(x, centerY + mapHeight);
-    ctx.stroke();
-  }
-
-  // Horizontal lines
-  for (let r = 0; r <= WORLD_ROWS; r++) {
-    const y = Math.floor(centerY + r * TILE_SIZE) + 0.5;
-    ctx.beginPath();
-    ctx.moveTo(centerX, y);
-    ctx.lineTo(centerX + mapWidth, y);
-    ctx.stroke();
-  }
+function drawMap(context: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
+  MAP001.render(context, canvas);
 }
 
 function drawPlayer(
-  ctx: CanvasRenderingContext2D,
+  context: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
   nick: string,
   player: Player,
@@ -262,65 +243,65 @@ function drawPlayer(
 ): void {
   const mapWidth  = WORLD_COLS * TILE_SIZE;
   const mapHeight = WORLD_ROWS * TILE_SIZE;
-  const offsetX   = (canvas.width  - mapWidth) / 2;
-  const offsetY   = (canvas.height - mapHeight) / 2;
+  const offsetX   = Math.floor((canvas.width - mapWidth) / 2);
+  const offsetY   = Math.floor((canvas.height - mapHeight) / 2);
 
   const spriteW = TILE_SIZE;
   const spriteH = TILE_SIZE;
-  const x = offsetX + player.px - spriteW / 2;
-  const y = offsetY + player.py - spriteH / 2;
+  const x = offsetX + player.positionX - spriteW / 2;
+  const y = offsetY + player.positionY - spriteH / 2;
 
   // Simple blocky sprite (head + body + shoes)
-  ctx.fillStyle = isSelf ? "#e2574c" : "#3a6ea5";
-  ctx.fillRect(x + spriteW * 0.1, y + spriteH * 0.35, spriteW * 0.8, spriteH * 0.5);
+  context.fillStyle = isSelf ? "#e2574c" : "#3a6ea5";
+  context.fillRect(x + spriteW * 0.1, y + spriteH * 0.35, spriteW * 0.8, spriteH * 0.5);
 
-  ctx.fillStyle = "#2b2d42";
-  ctx.fillRect(x + spriteW * 0.2, y + spriteH * 0.15, spriteW * 0.6, spriteH * 0.25);
+  context.fillStyle = "#2b2d42";
+  context.fillRect(x + spriteW * 0.2, y + spriteH * 0.15, spriteW * 0.6, spriteH * 0.25);
 
-  ctx.fillStyle = "#f4d3ae";
-  ctx.fillRect(x + spriteW * 0.35, y + spriteH * 0.32, spriteW * 0.3, spriteH * 0.2);
+  context.fillStyle = "#f4d3ae";
+  context.fillRect(x + spriteW * 0.35, y + spriteH * 0.32, spriteW * 0.3, spriteH * 0.2);
 
-  ctx.fillStyle = "#111";
-  ctx.fillRect(x + spriteW * 0.25, y + spriteH * 0.78, spriteW * 0.2, spriteH * 0.14);
-  ctx.fillRect(x + spriteW * 0.55, y + spriteH * 0.78, spriteW * 0.2, spriteH * 0.14);
+  context.fillStyle = "#111";
+  context.fillRect(x + spriteW * 0.25, y + spriteH * 0.78, spriteW * 0.2, spriteH * 0.14);
+  context.fillRect(x + spriteW * 0.55, y + spriteH * 0.78, spriteW * 0.2, spriteH * 0.14);
 
-  ctx.fillStyle = "#0f172a";
-  ctx.font = `${Math.max(10, Math.floor(spriteH * 0.35))}px monospace`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "top";
-  ctx.fillText(nick, x + spriteW / 2, y - spriteH * 0.35);
+  context.fillStyle = "#0f172a";
+  context.font = `${Math.max(10, Math.floor(spriteH * 0.35))}px monospace`;
+  context.textAlign = "center";
+  context.textBaseline = "top";
+  context.fillText(nick, x + spriteW / 2, y - spriteH * 0.35);
 }
 
 function render(
   game: Vibi<GameState, GamePost>,
-  ctx: CanvasRenderingContext2D,
+  context: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
   room: string,
   nick: string
 ): void {
-  drawGrid(ctx, canvas);
+  drawMap(context, canvas);
 
   const state = game.compute_render_state();
 
-  for (const [id, player] of Object.entries(state)) {
+  for (const [playerNick, player] of Object.entries(state)) {
     if (!player) continue;
-    drawPlayer(ctx, canvas, id, player, id === nick);
+    drawPlayer(context, canvas, playerNick, player, playerNick === nick);
   }
 
   // Simple HUD with timing info
-  ctx.fillStyle = "#0f172a";
-  ctx.font = "14px monospace";
-  ctx.textAlign = "left";
-  ctx.textBaseline = "top";
+  context.fillStyle = "#0f172a";
+  context.font = "14px monospace";
+  context.textAlign = "left";
+  context.textBaseline = "top";
 
   const serverTick = game.server_tick();
-  const rtt        = ping();
-  ctx.fillText(`room: ${room}`, 12, 12);
-  ctx.fillText(`tick: ${serverTick}`, 12, 30);
-  if (isFinite(rtt)) {
-    ctx.fillText(`ping: ${Math.round(rtt)} ms`, 12, 48);
+  const roundTripTimeMs = ping();
+  context.fillText(`room: ${room}`, 12, 12);
+  context.fillText(`tick: ${serverTick}`, 12, 30);
+  if (isFinite(roundTripTimeMs)) {
+    context.fillText(`ping: ${Math.round(roundTripTimeMs)} ms`, 12, 48);
   }
-  ctx.fillText("WASD to move", 12, 66);
+  context.fillText("WASD to move", 12, 66);
 }
 
 let started = false;
@@ -339,13 +320,13 @@ export function startGame(): void {
   }
 
   const canvas = makeCanvas();
-  const ctx    = canvas.getContext("2d");
-  if (!ctx) throw new Error("Canvas 2D context unavailable");
-  ctx.imageSmoothingEnabled = false;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("Canvas 2D context unavailable");
+  context.imageSmoothingEnabled = false;
   container.innerHTML = "";
   container.appendChild(canvas);
-  resizeCanvas(canvas);
-  window.addEventListener("resize", () => resizeCanvas(canvas));
+  // resizeCanvas(canvas);
+  // window.addEventListener("resize", () => resizeCanvas(canvas));
 
   let room = prompt("Enter ROOM name:") || "";
   room = room.trim() || gen_name();
@@ -375,7 +356,7 @@ export function startGame(): void {
 
   const game: Vibi<GameState, GamePost> = createGame(room, smooth);
 
-  const keyStates: Record<"w" | "a" | "s" | "d", boolean> = {
+  const keyStates: Record<MovementKey, boolean> = {
     w: false,
     a: false,
     s: false,
@@ -383,9 +364,9 @@ export function startGame(): void {
   };
 
   on_sync(() => {
-    const spawnX = Math.floor(WORLD_WIDTH / 2);
-    const spawnY = Math.floor(WORLD_HEIGHT / 2);
-    game.post({ $: "spawn", nick, px: spawnX, py: spawnY });
+    const spawnPixelX = Math.floor(WORLD_WIDTH / 2);
+    const spawnPixelY = Math.floor(WORLD_HEIGHT / 2);
+    game.post({ $: "spawn", nick, px: spawnPixelX, py: spawnPixelY });
 
     const validKeys = new Set(["w", "a", "s", "d"]);
 
@@ -394,7 +375,7 @@ export function startGame(): void {
       if (!validKeys.has(key)) return;
 
       const isDown = event.type === "keydown";
-      const keyName = key as "w" | "a" | "s" | "d";
+      const keyName = key as MovementKey;
       if (keyStates[keyName] === isDown) return;
 
       keyStates[keyName] = isDown;
@@ -406,7 +387,7 @@ export function startGame(): void {
     window.addEventListener("keyup", handleKeyEvent);
 
     const step = () => {
-      render(game, ctx, canvas, room, nick);
+      render(game, context, canvas, room, nick);
       requestAnimationFrame(step);
     };
     requestAnimationFrame(step);

@@ -9,7 +9,7 @@
             "skipFiles": [
                 "<node_internals>/**"
             ],
-            "program": "${workspaceFolder}/src/server.ts",
+            "program": "${workspaceFolder}/src/game/maps/map001.ts",
             "runtimeArgs": [ "-r", "ts-node/register", "-r", "tsconfig-paths/register" ],
             "console": "integratedTerminal",
             "outFiles": [
