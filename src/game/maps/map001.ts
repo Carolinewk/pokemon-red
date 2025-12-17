@@ -188,12 +188,10 @@ export function createMap001(): GameMap { // function will return result of type
   }; 
 
   const render = (context: CanvasRenderingContext2D, canvas: HTMLCanvasElement): void => {
-    context.fillStyle = "#556571ff";
-    context.fillRect(0, 0, canvas.width, canvas.height);
-
     const offsetX = Math.floor((canvas.width - pixelWidth) / 2); // center x the map in the canvas
     const offsetY = Math.floor((canvas.height - pixelHeight) / 2); // center y the map in the canvas
 
+    // const canDrawTiles = false;
     const canDrawTiles = tilesetImage.complete && tilesetImage.naturalWidth > 0;
     if (!canDrawTiles) {
       context.fillStyle = "#0f172a";

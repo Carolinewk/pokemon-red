@@ -1,6 +1,7 @@
 import { Vibi } from "../engine/vibi";
 import { on_sync, ping, gen_name } from "../network/client";
 import * as syncClient from "../network/client";
+import { GAMEBOY_DRAW } from "./gameboy/gameboy";
 import { MAP001 } from "./maps/map001";
 
 type MovementKey = "w" | "a" | "s" | "d";
@@ -325,8 +326,17 @@ export function startGame(): void {
   context.imageSmoothingEnabled = false;
   container.innerHTML = "";
   container.appendChild(canvas);
+  const drawStaticGameboy = () =>
+    GAMEBOY_DRAW(context, canvas).catch((error) =>
+      console.error("Failed to draw Gameboy background", error)
+    );
+
   resizeCanvas(canvas);
-  window.addEventListener("resize", () => resizeCanvas(canvas));
+  drawStaticGameboy();
+  window.addEventListener("resize", () => {
+    resizeCanvas(canvas);
+    drawStaticGameboy();
+  });
 
   let room = prompt("Enter ROOM name:") || "";
   room = room.trim() || gen_name();
