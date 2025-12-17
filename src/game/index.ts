@@ -325,8 +325,8 @@ export function startGame(): void {
   context.imageSmoothingEnabled = false;
   container.innerHTML = "";
   container.appendChild(canvas);
-  // resizeCanvas(canvas);
-  // window.addEventListener("resize", () => resizeCanvas(canvas));
+  resizeCanvas(canvas);
+  window.addEventListener("resize", () => resizeCanvas(canvas));
 
   let room = prompt("Enter ROOM name:") || "";
   room = room.trim() || gen_name();
@@ -345,7 +345,7 @@ export function startGame(): void {
     break;
   }
 
-  document.title = `Pokemon Grid (${room})`;
+  document.title = `Pokemon Red (${room})`;
 
   const smooth = (past: GameState, curr: GameState): GameState => {
     if (curr[nick]) {
