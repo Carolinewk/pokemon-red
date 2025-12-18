@@ -39,7 +39,7 @@ export type GameMap = {
   height: number;
   pixelWidth: number;
   pixelHeight: number;
-  render: (context: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => void;
+  render: (mapSettings: any, context: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => void; // change any
   isBlocked: (tileX: number, tileY: number) => boolean;
 };
 
@@ -188,7 +188,7 @@ export function createMap001(): GameMap { // function will return result of type
     return collisionData[tileY * map.width + tileX] !== 0;
   }; 
 
-  const render = (context: CanvasRenderingContext2D, canvas: HTMLCanvasElement): void => {
+  const render = (mapSettings: any, context: CanvasRenderingContext2D, canvas: HTMLCanvasElement): void => {
 
     // fit the game map in the game area screen inside game boy
 
