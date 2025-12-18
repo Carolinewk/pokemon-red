@@ -221,9 +221,9 @@ function resizeCanvas(canvas: HTMLCanvasElement) {
   canvas.height = window.innerHeight;
 }
 
-// function drawMap(context: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
-//   MAP001.render(context, canvas);
-// }
+function drawMap(context: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
+  MAP001.render(context, canvas);
+}
 
 function render(
   game: Vibi<GameState, GamePost>,
@@ -232,7 +232,7 @@ function render(
   room: string,
   nick: string
 ): void {
-  // drawMap(context, canvas);
+  drawMap(context, canvas);
 
   const state = game.compute_render_state();
 
