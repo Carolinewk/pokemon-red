@@ -1,4 +1,5 @@
 import rawMap001 from "./map001.json";
+import { getGameboyLayout } from "../gameboy/gameboy";
 
 type TiledTilesetRef = {
   firstgid: number;
@@ -188,21 +189,34 @@ export function createMap001(): GameMap { // function will return result of type
   }; 
 
   const render = (context: CanvasRenderingContext2D, canvas: HTMLCanvasElement): void => {
-    const offsetX = Math.floor((canvas.width - pixelWidth) / 2); // center x the map in the canvas
-    const offsetY = Math.floor((canvas.height - pixelHeight) / 2); // center y the map in the canvas
 
-    // const canDrawTiles = false;
+    // fit the game map in the game area screen inside game boy
+
+    const { screenX, screenY, screenWidth, screenHeight } = getGameboyLayout(canvas);
+    const offsetX = Math.floor(screenX + (screenWidth - pixelWidth) / 2);
+    const offsetY = Math.floor(screenY + (screenHeight - pixelHeight) / 2);
+
+    // const canDrawTiles = false
     const canDrawTiles = tilesetImage.complete && tilesetImage.naturalWidth > 0;
     if (!canDrawTiles) {
+      const centerX = Math.floor(screenX + screenWidth / 2);
+      const centerY = Math.floor(screenY + screenHeight / 2);
       context.fillStyle = "#0f172a";
+      context.fillRect(screenX, screenY, screenWidth, screenHeight);
+      context.fillStyle = "#e2e8f0";
       context.font = "14px monospace";
       context.textAlign = "center";
       context.textBaseline = "middle";
-      context.fillText("Loading tileset...", canvas.width / 2, canvas.height / 2);
+      context.fillText("Loading tileset...", centerX, centerY);
       return;
     }
 
     const tilesetColumns = Math.max(1, Math.floor(tilesetImage.naturalWidth / tileSize));
+
+    context.save();
+    context.beginPath();
+    context.rect(screenX, screenY, screenWidth, screenHeight);
+    context.clip();
 
     for (const layer of layersToDraw) {
       if (!layer.data || layer.data.length !== map.width * map.height) continue;
@@ -245,6 +259,8 @@ export function createMap001(): GameMap { // function will return result of type
         context.restore();
       }
     }
+
+    context.restore();
   };
 
   return {

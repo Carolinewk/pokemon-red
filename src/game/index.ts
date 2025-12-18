@@ -1,7 +1,7 @@
 import { Vibi } from "../engine/vibi";
 import { on_sync, ping, gen_name } from "../network/client";
 import * as syncClient from "../network/client";
-import { GAMEBOY_DRAW } from "./gameboy/gameboy";
+import { GAMEBOY_DRAW, getGameboyLayout } from "./gameboy/gameboy";
 import { MAP001 } from "./maps/map001";
 
 type MovementKey = "w" | "a" | "s" | "d";
@@ -244,13 +244,19 @@ function drawPlayer(
 ): void {
   const mapWidth  = WORLD_COLS * TILE_SIZE;
   const mapHeight = WORLD_ROWS * TILE_SIZE;
-  const offsetX   = Math.floor((canvas.width - mapWidth) / 2);
-  const offsetY   = Math.floor((canvas.height - mapHeight) / 2);
+  const { screenX, screenY, screenWidth, screenHeight } = getGameboyLayout(canvas);
+  const offsetX   = Math.floor(screenX + (screenWidth - mapWidth) / 2);
+  const offsetY   = Math.floor(screenY + (screenHeight - mapHeight) / 2);
 
   const spriteW = TILE_SIZE;
   const spriteH = TILE_SIZE;
   const x = offsetX + player.positionX - spriteW / 2;
   const y = offsetY + player.positionY - spriteH / 2;
+
+  context.save();
+  context.beginPath();
+  context.rect(screenX, screenY, screenWidth, screenHeight);
+  context.clip();
 
   // Simple blocky sprite (head + body + shoes)
   context.fillStyle = isSelf ? "#e2574c" : "#3a6ea5";
@@ -271,6 +277,8 @@ function drawPlayer(
   context.textAlign = "center";
   context.textBaseline = "top";
   context.fillText(nick, x + spriteW / 2, y - spriteH * 0.35);
+
+  context.restore();
 }
 
 function render(
@@ -307,10 +315,6 @@ function render(
 
 let started = false;
 
-/**
- * Entry point for client-side game logic.
- * Sets up the canvas, networking, and render loop.
- */
 export function startGame(): void {
   if (started) return;
   started = true;
@@ -406,7 +410,6 @@ export function startGame(): void {
 
 export { Vibi, syncClient };
 
-// Auto-start when loaded in the browser bundle
 if (typeof window !== "undefined") {
   startGame();
 }
