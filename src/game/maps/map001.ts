@@ -203,8 +203,8 @@ export function createMap001(): GameMap { // function will return result of type
     const { screenX, screenY, screenWidth, screenHeight } = getGameboyLayout(canvas);
     const defaultX = Math.floor(screenX + (screenWidth - pixelWidth) / 2);
     const defaultY = Math.floor(screenY + (screenHeight - pixelHeight) / 2);
-    const offsetX = Math.floor(options?.mapX ?? defaultX);
-    const offsetY = Math.floor(options?.mapY ?? defaultY);
+    const mapX = Math.floor(options?.mapX ?? defaultX); // mapX = screencenterx - player.position.x
+    const mapY = Math.floor(options?.mapY ?? defaultY);
 
     // const canDrawTiles = false
     const canDrawTiles = tilesetImage.complete && tilesetImage.naturalWidth > 0;
@@ -252,8 +252,8 @@ export function createMap001(): GameMap { // function will return result of type
           const tilesetTileIndex = globalTileId - tilesetRef.firstgid;
           if (tilesetTileIndex < 0) continue;
 
-          const destinationCanvasX = offsetX + col * tileSize;
-          const destinationCanvasY = offsetY + row * tileSize;
+          const destinationCanvasX = mapX + col * tileSize;
+          const destinationCanvasY = mapY + row * tileSize;
           renderTile(
             context,
             tilesetImage,

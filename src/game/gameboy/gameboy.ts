@@ -6,10 +6,14 @@ const loadImage = (src: string): Promise<HTMLImageElement> =>
     image.src = src;
   });
 
+let cachedGameboyImages: { small: HTMLImageElement; large: HTMLImageElement } | null = null;
 const gameboyImagesPromise = Promise.all([
   loadImage("/assets/background/gameboySmall.png"),
   loadImage("/assets/background/gameboyLarge.png"),
-]).then(([small, large]) => ({ small, large }));
+]).then(([small, large]) => {
+  cachedGameboyImages = { small, large };
+  return cachedGameboyImages;
+});
 
 const GAMEBOY_SCREEN_WIDTH = 472;
 const GAMEBOY_SCREEN_HEIGHT = 330;
@@ -30,6 +34,8 @@ export type GameboyLayout = {
   gameboyY: number;
   gameboyWidth: number;
   gameboyHeight: number;
+  screenOffsetX: number;
+  screenOffsetY: number;
   screenX: number;
   screenY: number;
   screenWidth: number;
@@ -55,6 +61,8 @@ export function getGameboyLayout(canvas: HTMLCanvasElement): GameboyLayout {
     gameboyY,
     gameboyWidth,
     gameboyHeight,
+    screenOffsetX,
+    screenOffsetY,
     screenX,
     screenY,
     screenWidth: GAMEBOY_SCREEN_WIDTH,
@@ -66,13 +74,24 @@ export const GAMEBOY_DRAW = async (
   context: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement
 ): Promise<void> => {
-  const { small, large } = await gameboyImagesPromise;
+  await gameboyImagesPromise;
+  drawGameboyBackground(context, canvas);
+};
 
+export function drawGameboyBackground(
+  context: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement
+): void {
   context.fillStyle = "#f0d7b7ff";
   context.fillRect(0, 0, canvas.width, canvas.height);
 
-  const gameboyImage = canvas.height < 800 ? small : large;
+  const images = cachedGameboyImages;
+  if (!images) {
+    return;
+  }
+
+  const gameboyImage = canvas.height < 800 ? images.small : images.large;
   const canvasCenterX = Math.floor((canvas.width - gameboyImage.width) / 2);
   const canvasCenterY = Math.floor((canvas.height - gameboyImage.height) / 2);
   context.drawImage(gameboyImage, canvasCenterX, canvasCenterY);
-};
+}

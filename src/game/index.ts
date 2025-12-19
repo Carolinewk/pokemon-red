@@ -1,10 +1,11 @@
 import { Vibi } from "../engine/vibi";
 import { on_sync, ping, gen_name } from "../network/client";
 import * as syncClient from "../network/client";
-import { GAMEBOY_DRAW } from "./gameboy/gameboy";
+import { drawGameboyBackground, GAMEBOY_DRAW } from "./gameboy/gameboy";
 import { MAP001 } from "./maps/map001";
 import { Player, drawPlayerAndCamera }  from "./player/player";
 import { createCameraCenteredOn, renderMapWithCamera } from "./camera/camera";
+import { drawLayoutOverlay } from "./debug/layoutOverlay";
 
 
 type MovementKey = "w" | "a" | "s" | "d";
@@ -168,8 +169,8 @@ function on_post(post: GamePost, state: GameState): GameState {
         return state;
       }
 
-      const spawnPixelX = post.px;
-      const spawnPixelY = post.py;
+      const spawnPixelX = post.px; // map center x
+      const spawnPixelY = post.py; // map center y
       const spawnTileX = nearestTileIndex(spawnPixelX, WORLD_COLS - 1);
       const spawnTileY = nearestTileIndex(spawnPixelY, WORLD_ROWS - 1);
       const spawnTileCenterX = tileCenterFromIndex(spawnTileX);
@@ -222,6 +223,14 @@ function resizeCanvas(canvas: HTMLCanvasElement) {
   canvas.height = window.innerHeight;
 }
 
+function debugBordersEnabled(): boolean {
+  if (typeof window === "undefined") return false;
+  const params = new URLSearchParams(window.location.search);
+  if (!params.has("debugBorders")) return false;
+  const raw = (params.get("debugBorders") ?? "").trim().toLowerCase();
+  return !new Set(["0", "false", "off", "no"]).has(raw);
+}
+
 function render(
   game: Vibi<GameState, GamePost>,
   context: CanvasRenderingContext2D,
@@ -229,9 +238,15 @@ function render(
   room: string,
   nick: string
 ): void {
+  const showDebugBorders = debugBordersEnabled();
+  if (showDebugBorders) {
+    // When drawing debug overlays (some of which extend outside the clipped screen),
+    // redraw the full Gameboy background each frame to avoid leaving "trails".
+    drawGameboyBackground(context, canvas);
+  }
+
   const state = game.compute_render_state();
 
-  // Camera is centered on "you". If you're not spawned yet, keep the map centered.
   const selfPlayer = state[nick];
   const camera = selfPlayer
     ? createCameraCenteredOn(selfPlayer.positionX, selfPlayer.positionY, canvas)
@@ -258,6 +273,16 @@ function render(
     context.fillText(`ping: ${Math.round(roundTripTimeMs)} ms`, 12, 48);
   }
   context.fillText("WASD to move", 12, 66);
+
+  if (showDebugBorders) {
+    drawLayoutOverlay(context, canvas, {
+      camera,
+      players: state,
+      selfNick: nick,
+      worldWidth: WORLD_WIDTH,
+      worldHeight: WORLD_HEIGHT,
+    });
+  }
 }
 
 let started = false;
