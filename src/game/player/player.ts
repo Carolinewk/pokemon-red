@@ -1,6 +1,6 @@
 import { MAP001 } from "../maps/map001";
 import { getGameboyLayout } from "../gameboy/gameboy";
-// import { CAMERA } from "../camera/camera";
+import type { Camera } from "../camera/camera";
 
 type Player = {
   positionX: number; // current position (tile-centered, pixels)
@@ -15,26 +15,23 @@ type Player = {
 };
 
 const TILE_SIZE         = MAP001.tileSize;
-const WORLD_COLS        = MAP001.width;
-const WORLD_ROWS        = MAP001.height;
 
 export function drawPlayerAndCamera(
     context: CanvasRenderingContext2D,
     canvas: HTMLCanvasElement,
     nick: string,
     player: Player,
-    isSelf: boolean
+    isSelf: boolean,
+    camera: Camera
     ): void {
-    const mapWidth  = WORLD_COLS * TILE_SIZE;
-    const mapHeight = WORLD_ROWS * TILE_SIZE;
     const { screenX, screenY, screenWidth, screenHeight } = getGameboyLayout(canvas);
-    const offsetX   = Math.floor(screenX + (screenWidth - mapWidth) / 2);
-    const offsetY   = Math.floor(screenY + (screenHeight - mapHeight) / 2);
 
     const spriteW = TILE_SIZE;
     const spriteH = TILE_SIZE;
-    const x = canvas.width / 2 - spriteW;
-    const y = screenY + screenHeight / 2 - spriteW / 2;
+    const { x, y } = camera.worldToCanvas(
+      player.positionX - spriteW / 2,
+      player.positionY - spriteH / 2
+    );
 
     context.save();
     context.beginPath();
@@ -63,8 +60,6 @@ export function drawPlayerAndCamera(
     // ==============================================
 
     context.restore();
-
-    // CAMERA(player, context, canvas);
 
 
 }

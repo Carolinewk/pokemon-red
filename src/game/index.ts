@@ -1,9 +1,10 @@
 import { Vibi } from "../engine/vibi";
 import { on_sync, ping, gen_name } from "../network/client";
 import * as syncClient from "../network/client";
-import { GAMEBOY_DRAW, getGameboyLayout } from "./gameboy/gameboy";
+import { GAMEBOY_DRAW } from "./gameboy/gameboy";
 import { MAP001 } from "./maps/map001";
 import { Player, drawPlayerAndCamera }  from "./player/player";
+import { createCameraCenteredOn, renderMapWithCamera } from "./camera/camera";
 
 
 type MovementKey = "w" | "a" | "s" | "d";
@@ -221,10 +222,6 @@ function resizeCanvas(canvas: HTMLCanvasElement) {
   canvas.height = window.innerHeight;
 }
 
-function drawMap(context: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
-  MAP001.render(context, canvas);
-}
-
 function render(
   game: Vibi<GameState, GamePost>,
   context: CanvasRenderingContext2D,
@@ -232,13 +229,19 @@ function render(
   room: string,
   nick: string
 ): void {
-  drawMap(context, canvas);
-
   const state = game.compute_render_state();
+
+  // Camera is centered on "you". If you're not spawned yet, keep the map centered.
+  const selfPlayer = state[nick];
+  const camera = selfPlayer
+    ? createCameraCenteredOn(selfPlayer.positionX, selfPlayer.positionY, canvas)
+    : createCameraCenteredOn(MAP001.pixelWidth / 2, MAP001.pixelHeight / 2, canvas);
+
+  renderMapWithCamera(context, canvas, camera);
 
   for (const [playerNick, player] of Object.entries(state)) {
     if (!player) continue;
-    drawPlayerAndCamera(context, canvas, playerNick, player, playerNick === nick);
+    drawPlayerAndCamera(context, canvas, playerNick, player, playerNick === nick, camera);
   }
 
   // Simple HUD with timing info

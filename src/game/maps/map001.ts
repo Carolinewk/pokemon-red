@@ -39,7 +39,11 @@ export type GameMap = {
   height: number;
   pixelWidth: number;
   pixelHeight: number;
-  render: (context: CanvasRenderingContext2D, canvas: HTMLCanvasElement) => void; // change any
+  render: (
+    context: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement,
+    options?: { mapX?: number; mapY?: number }
+  ) => void;
   isBlocked: (tileX: number, tileY: number) => boolean;
 };
 
@@ -188,13 +192,19 @@ export function createMap001(): GameMap { // function will return result of type
     return collisionData[tileY * map.width + tileX] !== 0;
   }; 
 
-  const render = (context: CanvasRenderingContext2D, canvas: HTMLCanvasElement): void => {
+  const render = (
+    context: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement,
+    options?: { mapX?: number; mapY?: number }
+  ): void => {
 
     // fit the game map in the game area screen inside game boy
 
     const { screenX, screenY, screenWidth, screenHeight } = getGameboyLayout(canvas);
-    const offsetX = Math.floor(screenX + (screenWidth - pixelWidth) / 2);
-    const offsetY = Math.floor(screenY + (screenHeight - pixelHeight) / 2);
+    const defaultX = Math.floor(screenX + (screenWidth - pixelWidth) / 2);
+    const defaultY = Math.floor(screenY + (screenHeight - pixelHeight) / 2);
+    const offsetX = Math.floor(options?.mapX ?? defaultX);
+    const offsetY = Math.floor(options?.mapY ?? defaultY);
 
     // const canDrawTiles = false
     const canDrawTiles = tilesetImage.complete && tilesetImage.naturalWidth > 0;
@@ -217,6 +227,11 @@ export function createMap001(): GameMap { // function will return result of type
     context.beginPath();
     context.rect(screenX, screenY, screenWidth, screenHeight);
     context.clip();
+
+    // With a Pokémon-style centered camera, the map can scroll past its own bounds.
+    // Always clear the full screen area first so we never leave stale pixels behind.
+    context.fillStyle = "#0f172a";
+    context.fillRect(screenX, screenY, screenWidth, screenHeight);
 
     for (const layer of layersToDraw) {
       if (!layer.data || layer.data.length !== map.width * map.height) continue;
